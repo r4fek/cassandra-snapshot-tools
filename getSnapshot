@@ -90,10 +90,11 @@
 
     function usage() {
         printf "Usage: $0 -h\n"
-        printf "       $0 -k <keyspace name> [-s <snapshot name>] [-y <cassandra.yaml file>] [--no-timestamp]\n"
+        printf "       $0 -k <keyspace name> - t <table name> [-s <snapshot name>] [-y <cassandra.yaml file>] [--no-timestamp]\n"
         printf "    -h,--help                          Print usage and exit\n"
         printf "    -v,--version                       Print version information and exit\n"
         printf "    -k,--keyspace <keyspace name>      REQUIRED: The name of the keyspace to snapshot\n"
+        printf "    -t,--table <table name>            REQUIRED The name of the table in keyspace to snapshot"
         printf "    -s,--snapshot <snapshot name>      The name of an existing snapshot to package\n"
         printf "    -y,--yaml <cassandra.yaml file>    Alternate cassandra.yaml file\n"
         printf "    --no-timestamp                     Don't include a timestamp in the resulting filename\n"
@@ -120,8 +121,8 @@
 # --------------------------
     # Great sample getopt implementation by Cosimo Streppone
     # https://gist.github.com/cosimo/3760587#file-parse-options-sh
-    SHORT='hvk:s:y:'
-    LONG='help,version,keyspace:,snapshot:,yaml:,no-timestamp'
+    SHORT='hvk:t:s:y:'
+    LONG='help,version,keyspace:,table:,snapshot:,yaml:,no-timestamp'
     OPTS=$( getopt -o $SHORT --long $LONG -n "$0" -- "$@" )
 
     if [ $? -gt 0 ]; then
@@ -136,6 +137,7 @@
             -h|--help) usage;;
             -v|--version) version;;
             -k|--keyspace) KEYSPACE="$2"; shift 2;;
+            -t|--table) TABLE="$2"; shift 2;;
             -s|--snapshot) SNAPSHOT="$2"; shift 2;;
             -y|--yaml) INPYAML="$2"; shift 2;;
             --no-timestamp) APPENDTIMESTAMP="no"; shift;;
@@ -229,7 +231,11 @@
         printf "No snapshot name provided, creating new snapshot\n"
 
         nodetool -h $JMXIP flush -- $KEYSPACE
-        OUTPUT=$( nodetool -h $JMXIP snapshot $KEYSPACE 2>&1 )
+        if [ -z "$TABLE"]; then
+            OUTPUT=$( nodetool -h $JMXIP snapshot $KEYSPACE 2>&1 )
+        else
+            OUTPUT=$( nodetool -h $JMXIP snapshot --table $TABLE $KEYSPACE 2>&1 )
+        fi
         SNAPSHOT=$( grep -Eo '[0-9]{10}[0-9]+' <<< "$OUTPUT" | tail -1 )
 
         # Check if the snapshot process failed
